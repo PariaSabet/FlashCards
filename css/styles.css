@@ -412,6 +412,14 @@ body {
   font-size: 14px;
 }
 
+.stat-pill--due {
+  color: var(--earth);
+}
+
+.stat-pill--due .stat-pill__value {
+  color: var(--earth);
+}
+
 .streak {
   display: flex;
   align-items: center;
@@ -471,6 +479,21 @@ body {
 .filter-btn--active {
   background: var(--forest);
   border-color: var(--forest);
+  color: #fff;
+}
+
+.filter-btn--due {
+  border-color: rgba(139, 105, 20, 0.3);
+  color: var(--earth);
+}
+
+.filter-btn--due:hover {
+  border-color: var(--earth);
+}
+
+.filter-btn--due.filter-btn--active {
+  background: var(--earth);
+  border-color: var(--earth);
   color: #fff;
 }
 
@@ -534,6 +557,43 @@ body {
   background: rgba(90, 140, 53, 0.1);
   padding: 4px 10px;
   border-radius: var(--radius-pill);
+}
+
+.card-front__box-badge {
+  position: absolute;
+  top: 1.2rem;
+  right: 1.4rem;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+}
+
+.card-front__box-badge[data-box="0"] {
+  color: var(--muted);
+  background: rgba(122, 122, 90, 0.1);
+}
+
+.card-front__box-badge[data-box="1"] {
+  color: var(--earth);
+  background: rgba(139, 105, 20, 0.1);
+}
+
+.card-front__box-badge[data-box="2"] {
+  color: var(--forest-light);
+  background: rgba(90, 140, 53, 0.1);
+}
+
+.card-front__box-badge[data-box="3"] {
+  color: var(--forest-mid);
+  background: rgba(61, 107, 31, 0.12);
+}
+
+.card-front__box-badge[data-box="4"] {
+  color: #fff;
+  background: var(--forest);
 }
 
 .card-front__hint {
@@ -728,6 +788,59 @@ body {
 
 .score-item--review .score-item__value {
   color: var(--earth);
+}
+
+.done__mastery {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 16px;
+  margin-bottom: 1.5rem;
+}
+
+.mastery-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.mastery-item__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.mastery-item[data-box="0"] .mastery-item__dot {
+  background: var(--muted);
+}
+
+.mastery-item[data-box="1"] .mastery-item__dot {
+  background: var(--earth);
+}
+
+.mastery-item[data-box="2"] .mastery-item__dot {
+  background: var(--forest-light);
+}
+
+.mastery-item[data-box="3"] .mastery-item__dot {
+  background: var(--forest-mid);
+}
+
+.mastery-item[data-box="4"] .mastery-item__dot {
+  background: var(--forest);
+}
+
+.mastery-item__label {
+  color: var(--ink);
+}
+
+.mastery-item__count {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--forest);
 }
 
 .done__actions {

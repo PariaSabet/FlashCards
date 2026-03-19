@@ -43,6 +43,7 @@
         of <span class="stat-pill__value" id="stat-total">&mdash;</span>
       </div>
       <div class="stat-pill">&check; Known: <span class="stat-pill__value" id="stat-known">0</span></div>
+      <div class="stat-pill stat-pill--due">Due: <span class="stat-pill__value" id="stat-due">0</span></div>
       <div class="streak" aria-label="Current streak">&#x1F525; Streak: <span id="stat-streak">0</span></div>
     </div>
 
@@ -66,6 +67,7 @@
           <span class="score-item__label">Review again</span>
         </div>
       </div>
+      <div class="done__mastery" id="done-mastery" aria-label="Mastery distribution"></div>
       <div class="done__actions">
         <button class="btn-home" id="btn-go-home" type="button">&larr; All topics</button>
         <button class="btn-restart" id="btn-restart" type="button">Start again</button>
@@ -78,6 +80,7 @@
       <div class="card-inner" id="card-inner">
         <div class="card-face card-front">
           <span class="card-front__category" id="card-cat"></span>
+          <span class="card-front__box-badge" id="card-box-badge" data-box="0">New</span>
           <span class="card-front__article" id="card-article"></span>
           <span class="card-front__word" id="card-word"></span>
           <span class="card-front__hint" aria-hidden="true">click to reveal &#x21BA;</span>

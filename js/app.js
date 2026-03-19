@@ -1,5 +1,6 @@
 /* ================================================================
    TCF French Flashcards — Application Logic
+   Leitner-box spaced repetition system
    ================================================================ */
 
 (function () {
@@ -7,12 +8,24 @@
 
   const STORAGE_KEY = "tcf-flashcards";
 
-  /* --- Persistence --- */
+  const BOX_INTERVALS = [
+    0,
+    4 * 3600000,
+    24 * 3600000,
+    3 * 24 * 3600000,
+    7 * 24 * 3600000,
+  ];
+
+  const BOX_LABELS = ["New", "Learning", "Familiar", "Confident", "Mastered"];
+  const MAX_BOX = BOX_INTERVALS.length - 1;
+
+  /* --- Persistence (Leitner SRS) --- */
 
   const Storage = {
     _read() {
       try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+        const raw = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+        return this._migrate(raw);
       } catch {
         return {};
       }
@@ -22,28 +35,89 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     },
 
-    getTopicProgress(topicId) {
-      const data = this._read();
-      return data[topicId] || { known: [], review: [] };
+    _migrate(data) {
+      let changed = false;
+      for (const topicId in data) {
+        const entry = data[topicId];
+        if (Array.isArray(entry.known) || Array.isArray(entry.review)) {
+          const words = {};
+          const now = Date.now();
+          if (entry.known) {
+            entry.known.forEach((w) => {
+              words[w] = { box: 3, ts: now };
+            });
+          }
+          if (entry.review) {
+            entry.review.forEach((w) => {
+              words[w] = { box: 0, ts: now };
+            });
+          }
+          data[topicId] = words;
+          changed = true;
+        }
+      }
+      if (changed) this._write(data);
+      return data;
     },
 
-    markWord(topicId, word, status) {
+    getTopicData(topicId) {
       const data = this._read();
-      if (!data[topicId]) data[topicId] = { known: [], review: [] };
-      const entry = data[topicId];
+      return data[topicId] || {};
+    },
 
-      entry.known = entry.known.filter((w) => w !== word);
-      entry.review = entry.review.filter((w) => w !== word);
+    getWordInfo(topicId, word) {
+      const topic = this.getTopicData(topicId);
+      return topic[word] || null;
+    },
 
-      if (status === "known") entry.known.push(word);
-      else if (status === "review") entry.review.push(word);
-
+    promoteWord(topicId, word) {
+      const data = this._read();
+      if (!data[topicId]) data[topicId] = {};
+      const current = data[topicId][word] || { box: 0, ts: 0 };
+      data[topicId][word] = {
+        box: Math.min(current.box + 1, MAX_BOX),
+        ts: Date.now(),
+      };
       this._write(data);
     },
 
-    getKnownCount(topicId) {
-      const progress = this.getTopicProgress(topicId);
-      return progress.known.length;
+    demoteWord(topicId, word) {
+      const data = this._read();
+      if (!data[topicId]) data[topicId] = {};
+      data[topicId][word] = { box: 0, ts: Date.now() };
+      this._write(data);
+    },
+
+    isWordDue(wordInfo) {
+      if (!wordInfo) return true;
+      const elapsed = Date.now() - wordInfo.ts;
+      return elapsed >= BOX_INTERVALS[wordInfo.box];
+    },
+
+    getTopicStats(topicId, cards) {
+      const topicData = this.getTopicData(topicId);
+      const boxes = [0, 0, 0, 0, 0];
+      let due = 0;
+
+      cards.forEach((c) => {
+        const info = topicData[c.word] || null;
+        const box = info ? info.box : 0;
+        boxes[box]++;
+        if (this.isWordDue(info)) due++;
+      });
+
+      return { boxes, due, total: cards.length };
+    },
+
+    getMasteryPct(topicId, cards) {
+      const topicData = this.getTopicData(topicId);
+      if (!cards.length) return 0;
+      let mastered = 0;
+      cards.forEach((c) => {
+        const info = topicData[c.word];
+        if (info && info.box >= 3) mastered++;
+      });
+      return Math.round((mastered / cards.length) * 100);
     },
 
     resetTopic(topicId) {
@@ -71,10 +145,12 @@
     cardNote: document.getElementById("card-note"),
     cardFr: document.getElementById("card-fr"),
     cardEn: document.getElementById("card-en"),
+    cardBoxBadge: document.getElementById("card-box-badge"),
     statCurrent: document.getElementById("stat-current"),
     statTotal: document.getElementById("stat-total"),
     statKnown: document.getElementById("stat-known"),
     statStreak: document.getElementById("stat-streak"),
+    statDue: document.getElementById("stat-due"),
     progressFill: document.getElementById("progress-fill"),
     btnPrev: document.getElementById("btn-prev"),
     btnNext: document.getElementById("btn-next"),
@@ -86,6 +162,7 @@
     doneScreen: document.getElementById("done-screen"),
     finalKnown: document.getElementById("final-known"),
     finalReview: document.getElementById("final-review"),
+    doneMastery: document.getElementById("done-mastery"),
     btnRestart: document.getElementById("btn-restart"),
     btnReset: document.getElementById("btn-reset"),
     btnBack: document.getElementById("btn-back"),
@@ -111,9 +188,9 @@
     dom.tocGrid.innerHTML = "";
 
     TOPICS.forEach((topic, i) => {
-      const known = Storage.getKnownCount(topic.id);
       const total = topic.cards.length;
-      const pct = total ? Math.round((known / total) * 100) : 0;
+      const pct = Storage.getMasteryPct(topic.id, topic.cards);
+      const stats = total ? Storage.getTopicStats(topic.id, topic.cards) : null;
 
       const card = document.createElement("article");
       card.className =
@@ -125,6 +202,19 @@
         `${topic.fr} — ${topic.en}${topic.available ? "" : " (coming soon)"}`,
       );
 
+      let statusText = "coming soon";
+      let statusClass = "topic-card__status--soon";
+      if (topic.available) {
+        statusClass = "topic-card__status--available";
+        if (!stats || stats.due === total) {
+          statusText = "Start \u2192";
+        } else if (stats.due > 0) {
+          statusText = stats.due + " due";
+        } else {
+          statusText = "All caught up";
+        }
+      }
+
       card.innerHTML = `
         ${!topic.available ? '<span class="topic-card__lock" aria-hidden="true">&#x1F512;</span>' : ""}
         <div class="topic-card__number" aria-hidden="true">0${i + 1}</div>
@@ -133,9 +223,7 @@
         <div class="topic-card__title-en">${topic.en}</div>
         <div class="topic-card__meta">
           <span class="topic-card__count">${total} words</span>
-          <span class="${topic.available ? "topic-card__status--available" : "topic-card__status--soon"}">
-            ${topic.available ? (pct > 0 ? pct + "% known" : "Start \u2192") : "coming soon"}
-          </span>
+          <span class="${statusClass}">${statusText}</span>
         </div>
         ${
           topic.available && total
@@ -172,17 +260,12 @@
     streak = 0;
     activeFilter = "all";
 
-    const saved = Storage.getTopicProgress(topic.id);
-    deck.forEach((card, idx) => {
-      if (saved.known.includes(card.word)) knownSet.add(idx);
-      else if (saved.review.includes(card.word)) againSet.add(idx);
-    });
-
     dom.btnShuffle.classList.remove("btn-shuffle--active");
     dom.studyTitle.textContent = topic.fr;
     dom.studySubtitle.textContent = topic.en;
 
     buildFilterBar(topic.cards);
+    updateDueStat();
 
     dom.homeScreen.hidden = true;
     dom.studyScreen.classList.add("study--active");
@@ -197,23 +280,42 @@
     buildHome();
   }
 
+  /* --- Due Count --- */
+
+  function updateDueStat() {
+    if (!activeTopic) return;
+    const stats = Storage.getTopicStats(activeTopic.id, fullDeck);
+    dom.statDue.textContent = stats.due;
+  }
+
   /* --- Filter Bar --- */
 
   function buildFilterBar(cards) {
-    const cats = ["all", ...new Set(cards.map((c) => c.cat))];
+    const topicData = Storage.getTopicData(activeTopic.id);
+    const dueCount = cards.filter((c) =>
+      Storage.isWordDue(topicData[c.word] || null),
+    ).length;
+
+    const cats = ["all", "due", ...new Set(cards.map((c) => c.cat))];
     dom.filterBar.innerHTML = "";
 
     cats.forEach((cat) => {
       const btn = document.createElement("button");
       btn.className =
-        "filter-btn" + (cat === "all" ? " filter-btn--active" : "");
+        "filter-btn" + (cat === activeFilter ? " filter-btn--active" : "");
       btn.dataset.cat = cat;
       btn.type = "button";
-      const count =
-        cat === "all"
-          ? cards.length
-          : cards.filter((c) => c.cat === cat).length;
-      btn.textContent = cat === "all" ? `All (${count})` : `${cat} (${count})`;
+
+      if (cat === "all") {
+        btn.textContent = `All (${cards.length})`;
+      } else if (cat === "due") {
+        btn.textContent = `Due (${dueCount})`;
+        btn.classList.add("filter-btn--due");
+      } else {
+        const count = cards.filter((c) => c.cat === cat).length;
+        btn.textContent = `${cat} (${count})`;
+      }
+
       btn.addEventListener("click", () => setFilter(cat));
       dom.filterBar.appendChild(btn);
     });
@@ -224,9 +326,20 @@
     dom.filterBar.querySelectorAll(".filter-btn").forEach((b) => {
       b.classList.toggle("filter-btn--active", b.dataset.cat === cat);
     });
-    deck =
-      cat === "all" ? [...fullDeck] : fullDeck.filter((c) => c.cat === cat);
-    if (shuffleMode) shuffle(deck);
+
+    if (cat === "due") {
+      const topicData = Storage.getTopicData(activeTopic.id);
+      deck = fullDeck.filter((c) =>
+        Storage.isWordDue(topicData[c.word] || null),
+      );
+      sortByPriority(deck);
+    } else if (cat === "all") {
+      deck = [...fullDeck];
+    } else {
+      deck = fullDeck.filter((c) => c.cat === cat);
+    }
+
+    if (shuffleMode && cat !== "due") shuffle(deck);
     currentIdx = 0;
     knownSet.clear();
     againSet.clear();
@@ -235,16 +348,37 @@
     renderCard();
   }
 
+  function sortByPriority(cards) {
+    const topicData = Storage.getTopicData(activeTopic.id);
+    cards.sort((a, b) => {
+      const da = topicData[a.word] || { box: 0, ts: 0 };
+      const db = topicData[b.word] || { box: 0, ts: 0 };
+      if (da.box !== db.box) return da.box - db.box;
+      return da.ts - db.ts;
+    });
+  }
+
   /* --- Shuffle --- */
 
   function toggleShuffle() {
     shuffleMode = !shuffleMode;
     dom.btnShuffle.classList.toggle("btn-shuffle--active", shuffleMode);
-    deck =
-      activeFilter === "all"
-        ? [...fullDeck]
-        : fullDeck.filter((c) => c.cat === activeFilter);
-    if (shuffleMode) shuffle(deck);
+
+    if (activeFilter === "due") {
+      const topicData = Storage.getTopicData(activeTopic.id);
+      deck = fullDeck.filter((c) =>
+        Storage.isWordDue(topicData[c.word] || null),
+      );
+      if (shuffleMode) shuffle(deck);
+      else sortByPriority(deck);
+    } else if (activeFilter === "all") {
+      deck = [...fullDeck];
+      if (shuffleMode) shuffle(deck);
+    } else {
+      deck = fullDeck.filter((c) => c.cat === activeFilter);
+      if (shuffleMode) shuffle(deck);
+    }
+
     currentIdx = 0;
     knownSet.clear();
     againSet.clear();
@@ -276,6 +410,11 @@
     dom.cardNote.textContent = c.note || "";
     dom.cardFr.textContent = c.fr;
     dom.cardEn.textContent = c.en;
+
+    const wordInfo = Storage.getWordInfo(activeTopic.id, c.word);
+    const box = wordInfo ? wordInfo.box : 0;
+    dom.cardBoxBadge.textContent = BOX_LABELS[box];
+    dom.cardBoxBadge.dataset.box = box;
 
     dom.statCurrent.textContent = currentIdx + 1;
     dom.statTotal.textContent = deck.length;
@@ -322,7 +461,7 @@
     }
   }
 
-  /* --- Feedback --- */
+  /* --- Feedback (SRS) --- */
 
   function markKnown() {
     if (!isFlipped) return;
@@ -330,7 +469,8 @@
     againSet.delete(currentIdx);
     streak++;
     if (activeTopic) {
-      Storage.markWord(activeTopic.id, deck[currentIdx].word, "known");
+      Storage.promoteWord(activeTopic.id, deck[currentIdx].word);
+      updateDueStat();
     }
     nextCard();
   }
@@ -341,7 +481,8 @@
     knownSet.delete(currentIdx);
     streak = 0;
     if (activeTopic) {
-      Storage.markWord(activeTopic.id, deck[currentIdx].word, "review");
+      Storage.demoteWord(activeTopic.id, deck[currentIdx].word);
+      updateDueStat();
     }
     nextCard();
   }
@@ -353,6 +494,20 @@
     dom.doneScreen.classList.add("done--visible");
     dom.finalKnown.textContent = knownSet.size;
     dom.finalReview.textContent = againSet.size;
+
+    if (activeTopic) {
+      const stats = Storage.getTopicStats(activeTopic.id, fullDeck);
+      dom.doneMastery.innerHTML = stats.boxes
+        .map(
+          (count, i) =>
+            `<span class="mastery-item" data-box="${i}">` +
+            `<span class="mastery-item__dot"></span>` +
+            `<span class="mastery-item__label">${BOX_LABELS[i]}</span>` +
+            `<span class="mastery-item__count">${count}</span>` +
+            `</span>`,
+        )
+        .join("");
+    }
   }
 
   function hideDone() {
@@ -365,7 +520,20 @@
     knownSet.clear();
     againSet.clear();
     streak = 0;
-    if (shuffleMode) shuffle(deck);
+
+    if (activeFilter === "due") {
+      const topicData = Storage.getTopicData(activeTopic.id);
+      deck = fullDeck.filter((c) =>
+        Storage.isWordDue(topicData[c.word] || null),
+      );
+      if (shuffleMode) shuffle(deck);
+      else sortByPriority(deck);
+    } else {
+      if (shuffleMode) shuffle(deck);
+    }
+
+    buildFilterBar(fullDeck);
+    updateDueStat();
     hideDone();
     renderCard();
   }

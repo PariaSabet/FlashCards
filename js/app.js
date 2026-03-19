@@ -5,10 +5,53 @@
 (function () {
   "use strict";
 
-  const sessionProgress = {};
-  TOPICS.forEach((t) => {
-    sessionProgress[t.id] = 0;
-  });
+  const STORAGE_KEY = "tcf-flashcards";
+
+  /* --- Persistence --- */
+
+  const Storage = {
+    _read() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+      } catch {
+        return {};
+      }
+    },
+
+    _write(data) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    },
+
+    getTopicProgress(topicId) {
+      const data = this._read();
+      return data[topicId] || { known: [], review: [] };
+    },
+
+    markWord(topicId, word, status) {
+      const data = this._read();
+      if (!data[topicId]) data[topicId] = { known: [], review: [] };
+      const entry = data[topicId];
+
+      entry.known = entry.known.filter((w) => w !== word);
+      entry.review = entry.review.filter((w) => w !== word);
+
+      if (status === "known") entry.known.push(word);
+      else if (status === "review") entry.review.push(word);
+
+      this._write(data);
+    },
+
+    getKnownCount(topicId) {
+      const progress = this.getTopicProgress(topicId);
+      return progress.known.length;
+    },
+
+    resetTopic(topicId) {
+      const data = this._read();
+      delete data[topicId];
+      this._write(data);
+    },
+  };
 
   /* --- DOM Cache --- */
 
@@ -44,6 +87,7 @@
     finalKnown: document.getElementById("final-known"),
     finalReview: document.getElementById("final-review"),
     btnRestart: document.getElementById("btn-restart"),
+    btnReset: document.getElementById("btn-reset"),
     btnBack: document.getElementById("btn-back"),
     btnGoHome: document.getElementById("btn-go-home"),
   };
@@ -67,7 +111,7 @@
     dom.tocGrid.innerHTML = "";
 
     TOPICS.forEach((topic, i) => {
-      const known = sessionProgress[topic.id];
+      const known = Storage.getKnownCount(topic.id);
       const total = topic.cards.length;
       const pct = total ? Math.round((known / total) * 100) : 0;
 
@@ -78,7 +122,7 @@
       card.setAttribute("tabindex", topic.available ? "0" : "-1");
       card.setAttribute(
         "aria-label",
-        `${topic.fr} — ${topic.en}${topic.available ? "" : " (coming soon)"}`
+        `${topic.fr} — ${topic.en}${topic.available ? "" : " (coming soon)"}`,
       );
 
       card.innerHTML = `
@@ -128,6 +172,12 @@
     streak = 0;
     activeFilter = "all";
 
+    const saved = Storage.getTopicProgress(topic.id);
+    deck.forEach((card, idx) => {
+      if (saved.known.includes(card.word)) knownSet.add(idx);
+      else if (saved.review.includes(card.word)) againSet.add(idx);
+    });
+
     dom.btnShuffle.classList.remove("btn-shuffle--active");
     dom.studyTitle.textContent = topic.fr;
     dom.studySubtitle.textContent = topic.en;
@@ -160,9 +210,10 @@
       btn.dataset.cat = cat;
       btn.type = "button";
       const count =
-        cat === "all" ? cards.length : cards.filter((c) => c.cat === cat).length;
-      btn.textContent =
-        cat === "all" ? `All (${count})` : `${cat} (${count})`;
+        cat === "all"
+          ? cards.length
+          : cards.filter((c) => c.cat === cat).length;
+      btn.textContent = cat === "all" ? `All (${count})` : `${cat} (${count})`;
       btn.addEventListener("click", () => setFilter(cat));
       dom.filterBar.appendChild(btn);
     });
@@ -174,9 +225,7 @@
       b.classList.toggle("filter-btn--active", b.dataset.cat === cat);
     });
     deck =
-      cat === "all"
-        ? [...fullDeck]
-        : fullDeck.filter((c) => c.cat === cat);
+      cat === "all" ? [...fullDeck] : fullDeck.filter((c) => c.cat === cat);
     if (shuffleMode) shuffle(deck);
     currentIdx = 0;
     knownSet.clear();
@@ -249,7 +298,7 @@
     dom.feedbackBtns.classList.toggle("feedback--enabled", isFlipped);
     dom.cardScene.setAttribute(
       "aria-label",
-      isFlipped ? "Card back — click to flip" : "Card front — click to flip"
+      isFlipped ? "Card back — click to flip" : "Card front — click to flip",
     );
   }
 
@@ -280,7 +329,9 @@
     knownSet.add(currentIdx);
     againSet.delete(currentIdx);
     streak++;
-    if (activeTopic) sessionProgress[activeTopic.id] = knownSet.size;
+    if (activeTopic) {
+      Storage.markWord(activeTopic.id, deck[currentIdx].word, "known");
+    }
     nextCard();
   }
 
@@ -289,6 +340,9 @@
     againSet.add(currentIdx);
     knownSet.delete(currentIdx);
     streak = 0;
+    if (activeTopic) {
+      Storage.markWord(activeTopic.id, deck[currentIdx].word, "review");
+    }
     nextCard();
   }
 
@@ -316,11 +370,18 @@
     renderCard();
   }
 
+  function resetProgress() {
+    if (!activeTopic) return;
+    Storage.resetTopic(activeTopic.id);
+    restart();
+  }
+
   /* --- Event Listeners --- */
 
   dom.btnBack.addEventListener("click", goHome);
   dom.btnGoHome.addEventListener("click", goHome);
   dom.btnRestart.addEventListener("click", restart);
+  dom.btnReset.addEventListener("click", resetProgress);
   dom.btnPrev.addEventListener("click", prevCard);
   dom.btnNext.addEventListener("click", nextCard);
   dom.btnFlip.addEventListener("click", flipCard);

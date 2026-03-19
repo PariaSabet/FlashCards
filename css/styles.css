@@ -770,6 +770,24 @@ body {
   background: var(--forest-mid);
 }
 
+.btn-reset {
+  height: 48px;
+  padding: 0 1.5rem;
+  background: transparent;
+  color: var(--earth);
+  border-radius: var(--radius-btn);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1.5px solid rgba(139, 105, 20, 0.25);
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.btn-reset:hover {
+  background: rgba(139, 105, 20, 0.08);
+  border-color: var(--earth);
+}
+
 /* --- Responsive --- */
 
 @media (max-width: 500px) {

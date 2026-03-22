@@ -127,6 +127,30 @@
     },
   };
 
+  /* --- Text-to-Speech --- */
+
+  let frenchVoice = null;
+
+  function loadFrenchVoice() {
+    const voices = speechSynthesis.getVoices();
+    frenchVoice =
+      voices.find((v) => v.lang.startsWith("fr") && v.localService) ||
+      voices.find((v) => v.lang.startsWith("fr")) ||
+      null;
+  }
+
+  loadFrenchVoice();
+  speechSynthesis.addEventListener("voiceschanged", loadFrenchVoice);
+
+  function speakFrench(text) {
+    speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "fr-FR";
+    utterance.rate = 0.85;
+    if (frenchVoice) utterance.voice = frenchVoice;
+    speechSynthesis.speak(utterance);
+  }
+
   /* --- DOM Cache --- */
 
   const dom = {
@@ -167,6 +191,8 @@
     btnReset: document.getElementById("btn-reset"),
     btnBack: document.getElementById("btn-back"),
     btnGoHome: document.getElementById("btn-go-home"),
+    btnSpeakWord: document.getElementById("btn-speak-word"),
+    btnSpeakSentence: document.getElementById("btn-speak-sentence"),
   };
 
   /* --- Study State --- */
@@ -557,6 +583,21 @@
   dom.btnShuffle.addEventListener("click", toggleShuffle);
   dom.btnKnow.addEventListener("click", markKnown);
   dom.btnAgain.addEventListener("click", markAgain);
+
+  dom.btnSpeakWord.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (currentIdx < deck.length) {
+      const c = deck[currentIdx];
+      speakFrench(c.article + " " + c.word);
+    }
+  });
+
+  dom.btnSpeakSentence.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (currentIdx < deck.length) {
+      speakFrench(deck[currentIdx].fr);
+    }
+  });
 
   document.addEventListener("keydown", (e) => {
     if (dom.homeScreen.hidden === false) return;

@@ -130,6 +130,7 @@
   /* --- Text-to-Speech --- */
 
   let frenchVoice = null;
+  let currentAudio = null;
 
   function loadFrenchVoice() {
     const voices = speechSynthesis.getVoices();
@@ -142,13 +143,38 @@
   loadFrenchVoice();
   speechSynthesis.addEventListener("voiceschanged", loadFrenchVoice);
 
-  function speakFrench(text) {
+  function slugify(text) {
+    return text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+  }
+
+  function speakFallback(text) {
     speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "fr-FR";
     utterance.rate = 0.85;
     if (frenchVoice) utterance.voice = frenchVoice;
     speechSynthesis.speak(utterance);
+  }
+
+  function playAudio(topicId, word, suffix, fallbackText) {
+    if (currentAudio) {
+      currentAudio.pause();
+      currentAudio = null;
+    }
+    speechSynthesis.cancel();
+
+    const file = `audio/${topicId}/${slugify(word)}-${suffix}.mp3`;
+    const audio = new Audio(file);
+    currentAudio = audio;
+
+    audio.play().catch(() => {
+      speakFallback(fallbackText);
+    });
   }
 
   /* --- DOM Cache --- */
@@ -586,16 +612,17 @@
 
   dom.btnSpeakWord.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (currentIdx < deck.length) {
+    if (currentIdx < deck.length && activeTopic) {
       const c = deck[currentIdx];
-      speakFrench(c.article + " " + c.word);
+      playAudio(activeTopic.id, c.word, "word", c.article + " " + c.word);
     }
   });
 
   dom.btnSpeakSentence.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (currentIdx < deck.length) {
-      speakFrench(deck[currentIdx].fr);
+    if (currentIdx < deck.length && activeTopic) {
+      const c = deck[currentIdx];
+      playAudio(activeTopic.id, c.word, "sentence", c.fr);
     }
   });
 

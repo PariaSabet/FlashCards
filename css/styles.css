@@ -448,6 +448,44 @@ body {
   width: 0;
 }
 
+/* --- Section Bar --- */
+
+.section-bar {
+  width: 100%;
+  display: flex;
+  gap: 0;
+  margin-bottom: 0.8rem;
+  background: rgba(45, 80, 22, 0.06);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+}
+
+.section-btn {
+  flex: 1;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.section-btn:hover {
+  color: var(--forest);
+}
+
+.section-btn--active {
+  background: #fff;
+  color: var(--forest);
+  box-shadow: 0 1px 4px rgba(45, 80, 22, 0.12);
+  font-weight: 600;
+}
+
 /* --- Filter Bar --- */
 
 .filter-bar {

@@ -185,6 +185,7 @@
     tocGrid: document.getElementById("toc-grid"),
     studyTitle: document.getElementById("study-title"),
     studySubtitle: document.getElementById("study-subtitle"),
+    sectionBar: document.getElementById("section-bar"),
     filterBar: document.getElementById("filter-bar"),
     cardScene: document.getElementById("card-scene"),
     cardInner: document.getElementById("card-inner"),
@@ -221,9 +222,27 @@
     btnSpeakSentence: document.getElementById("btn-speak-sentence"),
   };
 
+  /* --- Section Helpers --- */
+
+  function getAllCards(topic) {
+    return [
+      ...topic.words.map((c) => ({ ...c, section: "word" })),
+      ...topic.collocations.map((c) => ({ ...c, section: "collocation" })),
+      ...topic.phrases.map((c) => ({ ...c, section: "phrase" })),
+    ];
+  }
+
+  const SECTION_META = {
+    all: { label: "All" },
+    word: { label: "Words" },
+    collocation: { label: "Collocations" },
+    phrase: { label: "Phrases" },
+  };
+
   /* --- Study State --- */
 
   let activeTopic = null;
+  let allTopicCards = [];
   let fullDeck = [];
   let deck = [];
   let currentIdx = 0;
@@ -232,6 +251,7 @@
   let knownSet = new Set();
   let againSet = new Set();
   let streak = 0;
+  let activeSection = "all";
   let activeFilter = "all";
 
   /* --- Home Screen --- */
@@ -240,9 +260,10 @@
     dom.tocGrid.innerHTML = "";
 
     TOPICS.forEach((topic, i) => {
-      const total = topic.cards.length;
-      const pct = Storage.getMasteryPct(topic.id, topic.cards);
-      const stats = total ? Storage.getTopicStats(topic.id, topic.cards) : null;
+      const cards = getAllCards(topic);
+      const total = cards.length;
+      const pct = Storage.getMasteryPct(topic.id, cards);
+      const stats = total ? Storage.getTopicStats(topic.id, cards) : null;
 
       const card = document.createElement("article");
       card.className =
@@ -274,7 +295,7 @@
         <div class="topic-card__title-fr">${topic.fr}</div>
         <div class="topic-card__title-en">${topic.en}</div>
         <div class="topic-card__meta">
-          <span class="topic-card__count">${total} words</span>
+          <span class="topic-card__count">${total} cards</span>
           <span class="${statusClass}">${statusText}</span>
         </div>
         ${
@@ -302,7 +323,9 @@
 
   function openTopic(topic) {
     activeTopic = topic;
-    fullDeck = [...topic.cards];
+    allTopicCards = getAllCards(topic);
+    activeSection = "all";
+    fullDeck = [...allTopicCards];
     deck = [...fullDeck];
     currentIdx = 0;
     isFlipped = false;
@@ -316,7 +339,8 @@
     dom.studyTitle.textContent = topic.fr;
     dom.studySubtitle.textContent = topic.en;
 
-    buildFilterBar(topic.cards);
+    buildSectionBar();
+    buildFilterBar(fullDeck);
     updateDueStat();
 
     dom.homeScreen.hidden = true;
@@ -336,8 +360,59 @@
 
   function updateDueStat() {
     if (!activeTopic) return;
-    const stats = Storage.getTopicStats(activeTopic.id, fullDeck);
+    const stats = Storage.getTopicStats(activeTopic.id, allTopicCards);
     dom.statDue.textContent = stats.due;
+  }
+
+  /* --- Section Bar --- */
+
+  function buildSectionBar() {
+    const sections = [
+      { id: "all", count: allTopicCards.length },
+      { id: "word", count: activeTopic.words.length },
+      { id: "collocation", count: activeTopic.collocations.length },
+      { id: "phrase", count: activeTopic.phrases.length },
+    ];
+
+    dom.sectionBar.innerHTML = "";
+    sections.forEach((s) => {
+      const btn = document.createElement("button");
+      btn.className =
+        "section-btn" + (s.id === activeSection ? " section-btn--active" : "");
+      btn.dataset.section = s.id;
+      btn.type = "button";
+      btn.textContent = `${SECTION_META[s.id].label} (${s.count})`;
+      btn.addEventListener("click", () => setSection(s.id));
+      dom.sectionBar.appendChild(btn);
+    });
+  }
+
+  function setSection(section) {
+    activeSection = section;
+    dom.sectionBar.querySelectorAll(".section-btn").forEach((b) => {
+      b.classList.toggle(
+        "section-btn--active",
+        b.dataset.section === section,
+      );
+    });
+
+    if (section === "all") {
+      fullDeck = [...allTopicCards];
+    } else {
+      fullDeck = allTopicCards.filter((c) => c.section === section);
+    }
+
+    activeFilter = "all";
+    deck = [...fullDeck];
+    if (shuffleMode) shuffle(deck);
+
+    buildFilterBar(fullDeck);
+    currentIdx = 0;
+    knownSet.clear();
+    againSet.clear();
+    streak = 0;
+    hideDone();
+    renderCard();
   }
 
   /* --- Filter Bar --- */
@@ -456,7 +531,7 @@
 
     const c = deck[currentIdx];
     dom.cardCat.textContent = c.cat;
-    dom.cardArticle.textContent = c.article;
+    dom.cardArticle.textContent = c.section === "word" ? c.article : "";
     dom.cardWord.textContent = c.word;
     dom.cardMeaning.textContent = c.meaning;
     dom.cardNote.textContent = c.note || "";
@@ -548,7 +623,7 @@
     dom.finalReview.textContent = againSet.size;
 
     if (activeTopic) {
-      const stats = Storage.getTopicStats(activeTopic.id, fullDeck);
+      const stats = Storage.getTopicStats(activeTopic.id, allTopicCards);
       dom.doneMastery.innerHTML = stats.boxes
         .map(
           (count, i) =>
@@ -584,6 +659,7 @@
       if (shuffleMode) shuffle(deck);
     }
 
+    buildSectionBar();
     buildFilterBar(fullDeck);
     updateDueStat();
     hideDone();
@@ -614,7 +690,8 @@
     e.stopPropagation();
     if (currentIdx < deck.length && activeTopic) {
       const c = deck[currentIdx];
-      playAudio(activeTopic.id, c.word, "word", c.article + " " + c.word);
+      const spokenWord = c.section === "word" ? c.article + " " + c.word : c.word;
+      playAudio(activeTopic.id, c.word, "word", spokenWord);
     }
   });
 

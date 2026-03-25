@@ -83,15 +83,20 @@ async function main() {
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
   for (const topic of topics) {
-    if (!topic.cards.length) continue;
+    const allCards = [
+      ...topic.words,
+      ...topic.collocations,
+      ...topic.phrases,
+    ];
+    if (!allCards.length) continue;
 
     const topicDir = path.join(AUDIO_DIR, topic.id);
     fs.mkdirSync(topicDir, { recursive: true });
-    console.log(`\n=== ${topic.fr} (${topic.cards.length} cards) ===`);
+    console.log(`\n=== ${topic.fr} (${allCards.length} cards) ===`);
 
-    for (const card of topic.cards) {
+    for (const card of allCards) {
       const s = slug(card.word);
-      const wordText = card.article + " " + card.word;
+      const wordText = card.article ? card.article + " " + card.word : card.word;
 
       await tts(wordText, WORD_INSTRUCTIONS, path.join(topicDir, s + "-word.mp3"));
       await sleep(DELAY_MS);

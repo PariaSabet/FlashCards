@@ -21,19 +21,25 @@ export default function SectionBar({ topic, activeSection, onSetSection }) {
 
   return (
     <div className="section-bar" role="tablist" aria-label="Filter by section">
-      {sections.map((s) => (
-        <button
-          key={s.id}
-          className={
-            "section-btn" + (s.id === activeSection ? " section-btn--active" : "")
-          }
-          data-section={s.id}
-          type="button"
-          onClick={() => onSetSection(s.id)}
-        >
-          {SECTION_META[s.id].label} ({s.count})
-        </button>
-      ))}
+      {sections.map((s) => {
+        const isEmpty = s.id !== "all" && s.count === 0;
+        return (
+          <button
+            key={s.id}
+            className={
+              "section-btn" +
+              (s.id === activeSection ? " section-btn--active" : "") +
+              (isEmpty ? " section-btn--disabled" : "")
+            }
+            data-section={s.id}
+            type="button"
+            disabled={isEmpty}
+            onClick={() => onSetSection(s.id)}
+          >
+            {SECTION_META[s.id].label} ({s.count})
+          </button>
+        );
+      })}
     </div>
   );
 }

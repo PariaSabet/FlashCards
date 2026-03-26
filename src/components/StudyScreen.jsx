@@ -453,7 +453,19 @@ export default function StudyScreen({ topic, onGoHome }) {
             onAgain={handleAgain}
           />
         </>
-      ) : null}
+      ) : (
+        <div className="empty-deck">
+          <span className="empty-deck__icon">📭</span>
+          <p className="empty-deck__text">No cards in this section yet.</p>
+          <button
+            className="empty-deck__btn"
+            type="button"
+            onClick={() => handleSetSection("all")}
+          >
+            Show all cards
+          </button>
+        </div>
+      )}
 
       <KeyboardHint />
     </section>

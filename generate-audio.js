@@ -1,5 +1,9 @@
-const fs = require("fs");
-const path = require("path");
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const API_KEY = process.env.OPENAI_API_KEY;
 if (!API_KEY) {
@@ -7,8 +11,7 @@ if (!API_KEY) {
   process.exit(1);
 }
 
-const DATA_FILE = path.join(__dirname, "js", "data.js");
-const AUDIO_DIR = path.join(__dirname, "audio");
+const AUDIO_DIR = path.join(__dirname, "public", "audio");
 const VOICE = "verse";
 const MODEL = "gpt-4o-mini-tts";
 const DELAY_MS = 300;
@@ -38,10 +41,9 @@ function slug(text) {
     .replace(/^-|-$/g, "");
 }
 
-function parseTopics() {
-  const src = fs.readFileSync(DATA_FILE, "utf-8");
-  const fn = new Function(src + "\nreturn TOPICS;");
-  return fn();
+async function parseTopics() {
+  const { TOPICS } = await import("./src/data.js");
+  return TOPICS;
 }
 
 async function tts(text, instructions, outPath) {
@@ -79,7 +81,7 @@ async function sleep(ms) {
 }
 
 async function main() {
-  const topics = parseTopics();
+  const topics = await parseTopics();
   fs.mkdirSync(AUDIO_DIR, { recursive: true });
 
   for (const topic of topics) {

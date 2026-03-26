@@ -1,4 +1,4 @@
-const TOPICS = [
+export const TOPICS = [
   {
     id: "environnement",
     fr: "L'environnement",

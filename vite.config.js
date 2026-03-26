@@ -41,7 +41,7 @@ export default defineConfig({
         name: "TCF French Flashcards",
         short_name: "TCF Flash",
         description: "Interactive flashcards for TCF French vocabulary practice",
-        theme_color: "#2d5016",
+        theme_color: "#f5f0e8",
         background_color: "#f5f0e8",
         display: "standalone",
         start_url: "/",

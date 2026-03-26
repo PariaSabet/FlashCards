@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Interactive flashcards for TCF French vocabulary practice">
-  <meta name="theme-color" content="#2d5016">
+  <meta name="theme-color" content="#f5f0e8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
   <title>TCF French Flashcards</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,7 +18,7 @@
 </head>
 <body>
   <script>
-    (function(){try{var d=localStorage.getItem('tcf-dark-mode');if(d==='true'||(d===null&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark')}catch(e){}})();
+    (function(){try{var d=localStorage.getItem('tcf-dark-mode');var dark=d==='true'||(d===null&&matchMedia('(prefers-color-scheme:dark)').matches);if(dark){document.documentElement.setAttribute('data-theme','dark');document.querySelector('meta[name="theme-color"]').setAttribute('content','#141a10')}}catch(e){}})();
   </script>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>

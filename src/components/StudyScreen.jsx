@@ -255,6 +255,7 @@ export default function StudyScreen({ topic, onGoHome }) {
     : [0, 0, 0, 0, 0];
 
   const currentCard = state.deck[state.currentIdx] || null;
+  const nextCard = state.deck[state.currentIdx + 1] || null;
   const wordInfo = currentCard
     ? storage.getWordInfo(state.topic.id, currentCard.word)
     : null;
@@ -424,12 +425,16 @@ export default function StudyScreen({ topic, onGoHome }) {
       ) : currentCard ? (
         <>
           <Flashcard
+            key={state.currentIdx}
             card={currentCard}
             box={currentBox}
             isFlipped={state.isFlipped}
             onFlip={handleFlip}
+            onPrev={handlePrev}
+            onNext={handleNext}
             onSpeakWord={handleSpeakWord}
             onSpeakSentence={handleSpeakSentence}
+            nextCard={nextCard}
           />
 
           <Controls
